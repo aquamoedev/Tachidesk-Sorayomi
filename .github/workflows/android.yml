@@ -1,43 +1,39 @@
-name: Android Build
+name: Build Android
 
 on:
   push:
-    branches: [ "main" ]
-  workflow_dispatch:
+    branches:
+      - main
+  pull_request:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: 'zulu'
           java-version: '17'
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+          flutter-version: '3.27.4'
 
-      - name: Install Dependencies
+      - name: Get dependencies
         run: flutter pub get
 
-      - name: Generate Code
+      - name: Generate Localizations
+        run: flutter gen-l10n
+
+      - name: Run Build Runner
         run: flutter pub run build_runner build --delete-conflicting-outputs
 
       - name: Build APK
         run: flutter build apk --release
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: build/app/outputs/flutter-apk/app-release.apk
-          tag_name: v${{ github.run_number }}
-          name: Release v${{ github.run_number }}
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
