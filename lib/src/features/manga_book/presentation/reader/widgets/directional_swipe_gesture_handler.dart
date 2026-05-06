@@ -65,14 +65,16 @@ class DirectionalSwipeGestureHandler extends HookWidget {
     }
   }
 
-  /// Advanced gesture handler using RawGestureDetector for proper arena competition
+  /// Advanced gesture handler: uses deferToChild so InteractiveViewer wins
+  /// the gesture arena for pinch-to-zoom; pan/swipe detection only fires
+  /// when the child doesn't consume the event (single-finger drag).
   Widget _buildAdvancedGestureHandler(BuildContext context) {
     return GestureDetector(
       onLongPressStart: onLongPressStart,
       onLongPressEnd: onLongPressEnd,
       onLongPressMoveUpdate: onLongPressMoveUpdate,
       onTap: onTap,
-      behavior: HitTestBehavior.translucent,
+      behavior: HitTestBehavior.deferToChild,
       onPanEnd: (details) {
         final swipeDirection = LastPageSwipeUtils.detectSwipeDirection(details);
 
@@ -88,28 +90,37 @@ class DirectionalSwipeGestureHandler extends HookWidget {
     );
   }
 
-  /// Simple gesture handler as fallback
+  /// Simple gesture handler as fallback.
+  /// Drag handlers are ONLY registered when chapter-swipe toggle is enabled;
+  /// otherwise they serve no purpose and compete with InteractiveViewer's
+  /// scale gesture in the arena, causing unreliable pinch-to-zoom.
   Widget _buildSimpleGestureHandler(BuildContext context) {
     return GestureDetector(
       onLongPressStart: onLongPressStart,
       onLongPressEnd: onLongPressEnd,
       onLongPressMoveUpdate: onLongPressMoveUpdate,
       onTap: onTap,
-      behavior: HitTestBehavior.translucent,
-      onHorizontalDragEnd: (details) {
-        _handleSwipeGesture(
-          context: context,
-          details: details,
-          allowedAxis: Axis.vertical,
-        );
-      },
-      onVerticalDragEnd: (details) {
-        _handleSwipeGesture(
-          context: context,
-          details: details,
-          allowedAxis: Axis.horizontal,
-        );
-      },
+      behavior: readerSwipeChapterToggle
+          ? HitTestBehavior.translucent
+          : HitTestBehavior.deferToChild,
+      onHorizontalDragEnd: readerSwipeChapterToggle
+          ? (details) {
+              _handleSwipeGesture(
+                context: context,
+                details: details,
+                allowedAxis: Axis.vertical,
+              );
+            }
+          : null,
+      onVerticalDragEnd: readerSwipeChapterToggle
+          ? (details) {
+              _handleSwipeGesture(
+                context: context,
+                details: details,
+                allowedAxis: Axis.horizontal,
+              );
+            }
+          : null,
       child: child,
     );
   }

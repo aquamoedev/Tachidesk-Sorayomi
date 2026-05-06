@@ -15,7 +15,6 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import '../../../../../../utils/extensions/custom_extensions.dart';
-import '../../../../../../utils/misc/app_utils.dart';
 import '../../../../../../widgets/server_image.dart';
 import '../../../../../settings/presentation/reader/widgets/reader_pinch_to_zoom/reader_pinch_to_zoom.dart';
 import '../../../../../settings/presentation/reader/widgets/reader_scroll_animation_tile/reader_scroll_animation_tile.dart';
@@ -180,76 +179,81 @@ class ContinuousReaderMode extends HookConsumerWidget {
         isAnimationEnabled,
         isNext: true,
       ),
-      child: AppUtils.wrapOn(
-        !kIsWeb &&
-                (Platform.isAndroid || Platform.isIOS) &&
-                isPinchToZoomEnabled
-            ? (Widget child) => InteractiveViewer(maxScale: 5, child: child)
-            : null,
-        ScrollablePositionedList.separated(
-          itemScrollController: scrollController,
-          itemPositionsListener: positionsListener,
-          initialScrollIndex: chapter.isRead.ifNull()
-              ? 0
-              : chapter.lastPageRead.getValueOnNullOrNegative(),
-          scrollDirection: scrollDirection,
-          reverse: reverse,
-          itemCount: chapterPages.chapter.pageCount,
-          minCacheExtent: scrollDirection == Axis.vertical
-              ? context.height * 2
-              : context.width * 2,
-          separatorBuilder: (BuildContext context, int index) =>
-              showSeparator ? const Gap(16) : const SizedBox.shrink(),
-          itemBuilder: (BuildContext context, int index) {
-            final Widget image = ServerImage(
-              showReloadButton: true,
-              fit: scrollDirection == Axis.vertical
-                  ? BoxFit.fitWidth
-                  : BoxFit.fitHeight,
-              appendApiToUrl: false,
-              imageUrl: chapterPages.pages[index],
-              progressIndicatorBuilder: (_, __, downloadProgress) => Center(
-                child: CircularProgressIndicator(
-                  value: downloadProgress.progress,
-                ),
+      child: ScrollablePositionedList.separated(
+        itemScrollController: scrollController,
+        itemPositionsListener: positionsListener,
+        initialScrollIndex: chapter.isRead.ifNull()
+            ? 0
+            : chapter.lastPageRead.getValueOnNullOrNegative(),
+        scrollDirection: scrollDirection,
+        reverse: reverse,
+        itemCount: chapterPages.chapter.pageCount,
+        minCacheExtent: scrollDirection == Axis.vertical
+            ? context.height * 2
+            : context.width * 2,
+        separatorBuilder: (BuildContext context, int index) =>
+            showSeparator ? const Gap(16) : const SizedBox.shrink(),
+        itemBuilder: (BuildContext context, int index) {
+          final Widget image = ServerImage(
+            showReloadButton: true,
+            fit: scrollDirection == Axis.vertical
+                ? BoxFit.fitWidth
+                : BoxFit.fitHeight,
+            appendApiToUrl: false,
+            imageUrl: chapterPages.pages[index],
+            progressIndicatorBuilder: (_, __, downloadProgress) => Center(
+              child: CircularProgressIndicator(
+                value: downloadProgress.progress,
               ),
-              wrapper: (Widget child) => SizedBox(
-                height: scrollDirection == Axis.vertical
-                    ? context.height * .7
-                    : null,
-                width: scrollDirection != Axis.vertical
-                    ? context.width * .7
-                    : null,
-                child: child,
+            ),
+            wrapper: (Widget child) => SizedBox(
+              height: scrollDirection == Axis.vertical
+                  ? context.height * .7
+                  : null,
+              width: scrollDirection != Axis.vertical
+                  ? context.width * .7
+                  : null,
+              child: child,
+            ),
+          );
+
+          Widget item;
+          if (index == 0 || index == chapterPages.chapter.pageCount - 1) {
+            final bool reverseDirection =
+                scrollDirection == Axis.horizontal && reverse;
+            final Widget separator = SizedBox(
+              width: scrollDirection != Axis.vertical
+                  ? context.width * .5
+                  : null,
+              child: ChapterSeparator(
+                manga: manga,
+                chapter: chapter,
+                isPreviousChapterSeparator: (index == 0),
               ),
             );
+            item = Flex(
+              direction: scrollDirection,
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: ((index == 0) != reverseDirection)
+                  ? [separator, image]
+                  : [image, separator],
+            );
+          } else {
+            item = image;
+          }
 
-            if (index == 0 || index == chapterPages.chapter.pageCount - 1) {
-              final bool reverseDirection =
-                  scrollDirection == Axis.horizontal && reverse;
-              final Widget separator = SizedBox(
-                width: scrollDirection != Axis.vertical
-                    ? context.width * .5
-                    : null,
-                child: ChapterSeparator(
-                  manga: manga,
-                  chapter: chapter,
-                  isPreviousChapterSeparator: (index == 0),
-                ),
-              );
-              return Flex(
-                direction: scrollDirection,
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: ((index == 0) != reverseDirection)
-                    ? [separator, image]
-                    : [image, separator],
-              );
-            } else {
-              return image;
-            }
-          },
-        ),
+          // Per-image InteractiveViewer to avoid gesture conflicts
+          // with the scrollable list (wrapping the entire list caused
+          // unreliable pinch detection)
+          if (!kIsWeb &&
+              (Platform.isAndroid || Platform.isIOS) &&
+              isPinchToZoomEnabled) {
+            item = InteractiveViewer(maxScale: 5, child: item);
+          }
+
+          return item;
+        },
       ),
     );
   }
